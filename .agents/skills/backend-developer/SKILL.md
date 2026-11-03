@@ -1,4 +1,4 @@
-git remote set-url origin https://github.com/TEN_TAI_KHOAN/TEN_REPO.git---
+git remote set-url origin https://github.com/TEN_TAI_KHOAN/TEN_REPO.gitgi---
 name: backend-developer
 description: "Quy chuẩn kiến trúc PHP MVC thuần, bảo mật cơ sở dữ liệu PDO Prepared Statements, ACID Transactions chống âm kho, quản lý Authentication/RBAC, CSRF Protection và chuẩn hóa OpenAPI/Swagger 3.0 Contract."
 ---
