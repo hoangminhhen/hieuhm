@@ -11,60 +11,73 @@ class ApiOrderController extends BaseApiController
         $this->model = new OrderModel();
     }
 
-    // URL: http://localhost/shop_ban_hang/api/order/create
-
+    // POST: /api/order/create
     public function create()
     {   
         $data = $this->getJsonPayload();
-        if (isset($data['user_id'], $data['customer_data'], $data['cart_items'])) {
-            $orderId = $this->model->createOrder($data['user_id'], $data['customer_data'], $data['cart_items']);
-            if ($orderId) {
-                $this->respond(201, "Đặt hàng thành công", ["order_id" => $orderId]);
-            }
-            $this->respond(500, "Lỗi khi tạo đơn hàng");
+        
+        $userId = $data['user_id'] ?? null;
+        if (!$userId) {
+            $user = $this->authenticateUser();
+            if ($user) $userId = $user['id'];
         }
-        $this->respond(400, "Thiếu dữ liệu tạo đơn hàng");
+
+        if ($userId && isset($data['customer_data'], $data['cart_items'])) {
+            $result = $this->model->createOrder($userId, $data['customer_data'], $data['cart_items']);
+            if ($result && !empty($result['success'])) {
+                $this->respond(201, "Đặt hàng thành công", $result);
+            }
+            $this->respond(400, $result['error'] ?? "Lỗi khi tạo đơn hàng");
+        }
+        $this->respond(400, "Thiếu thông tin người dùng, khách hàng hoặc sản phẩm giỏ hàng");
     }
 
-    // URL: http://localhost/shop_ban_hang/api/order/history
-
+    // GET: /api/order/history?user_id=1
     public function history()
     {
         $userId = $_GET['user_id'] ?? null;
+        if (!$userId) {
+            $user = $this->authenticateUser();
+            if ($user) $userId = $user['id'];
+        }
+
         if ($userId) {
             $orders = $this->model->getOrdersByUserId($userId);
             $this->respond(200, "Thành công", $orders);
         }
-        $this->respond(400, "Thiếu user_id");
+        $this->respond(400, "Vui lòng cung cấp user_id");
     }
 
-    // URL: http://localhost/shop_ban_hang/api/order/detail
-
+    // GET: /api/order/detail?id=1
     public function detail()
     {
         $orderId = $_GET['id'] ?? null;
         if ($orderId) {
             $order = $this->model->getOrderById($orderId);
-            $details = $this->model->getOrderDetail($orderId);
             if ($order) {
-                $order['items'] = $details;
+                $order['items'] = $this->model->getOrderDetail($orderId);
                 $this->respond(200, "Thành công", $order);
             }
             $this->respond(404, "Không tìm thấy đơn hàng");
         }
-        $this->respond(400, "Thiếu order id");
+        $this->respond(400, "Thiếu mã đơn hàng id");
     }
 
-    // URL: http://localhost/shop_ban_hang/api/order/cancel
-
+    // POST: /api/order/cancel
     public function cancel()
     {
         $data = $this->getJsonPayload();
-        if (isset($data['order_id'], $data['user_id'])) {
-            $success = $this->model->cancelOrder($data['order_id'], $data['user_id']);
-            if ($success) $this->respond(200, "Huỷ đơn hàng thành công");
-            else $this->respond(400, "Không thể huỷ đơn hàng này");
+        $orderId = $data['order_id'] ?? null;
+        $userId = $data['user_id'] ?? null;
+
+        if ($orderId) {
+            $success = $this->model->cancelOrder($orderId, $userId);
+            if ($success) {
+                $this->respond(200, "Hủy đơn hàng thành công và đã hoàn trả tồn kho");
+            }
+            $this->respond(400, "Không thể hủy đơn hàng này (chỉ được hủy đơn ở trạng thái chờ xử lý)");
         }
-        $this->respond(400, "Thiếu order_id hoặc user_id");
+        $this->respond(400, "Thiếu order_id");
     }
 }
+?>

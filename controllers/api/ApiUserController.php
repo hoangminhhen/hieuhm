@@ -11,64 +11,92 @@ class ApiUserController extends BaseApiController
         $this->model = new UserModel();
     }
 
-    // URL: http://localhost/shop_ban_hang/api/user/login
-
+    // POST: /api/user/login
     public function login()
     {
         $data = $this->getJsonPayload();
-        if (isset($data['email']) && isset($data['password'])) {
+        if (isset($data['email'], $data['password'])) {
             $user = $this->model->login($data['email'], $data['password']);
-            if ($user) {
+            
+            if (is_array($user) && isset($user['error']) && $user['error'] === 'ACCOUNT_LOCKED') {
+                $this->respond(403, $user['message']);
+            }
+
+            if ($user && is_array($user)) {
                 unset($user['password']);
+                // Cấp API Token
+                $tokenData = $this->model->generateApiToken($user['id']);
+                $user['access_token'] = $tokenData['token'];
+                $user['token_expires'] = $tokenData['expires_at'];
+
                 $this->respond(200, "Đăng nhập thành công", $user);
             }
-            $this->respond(401, "Email hoặc mật khẩu không đúng");
+            $this->respond(401, "Email hoặc mật khẩu không chính xác");
         }
-        $this->respond(400, "Thiếu email hoặc mật khẩu");
+        $this->respond(400, "Vui lòng cung cấp đầy đủ email và password");
     }
 
-    // URL: http://localhost/shop_ban_hang/api/user/register
-
+    // POST: /api/user/register
     public function register()
     {
         $data = $this->getJsonPayload();
-        if (isset($data['fullname'], $data['email'], $data['password'], $data['phone'], $data['address'])) {
+        if (!empty($data['fullname']) && !empty($data['email']) && !empty($data['password'])) {
             if ($this->model->checkEmail($data['email'])) {
-                $this->respond(409, "Email đã tồn tại");
+                $this->respond(409, "Địa chỉ email này đã được sử dụng");
             }
-            $success = $this->model->register($data['fullname'], $data['email'], $data['password'], $data['phone'], $data['address']);
-            if ($success) $this->respond(201, "Đăng ký thành công");
-            $this->respond(500, "Đăng ký thất bại");
+            if (strlen($data['password']) < 6) {
+                $this->respond(422, "Mật khẩu phải có độ dài tối thiểu 6 ký tự");
+            }
+
+            $phone = $data['phone'] ?? '';
+            $address = $data['address'] ?? '';
+            $success = $this->model->register($data['fullname'], $data['email'], $data['password'], $phone, $address);
+            if ($success) {
+                $this->respond(201, "Đăng ký tài khoản thành công!");
+            }
+            $this->respond(500, "Đăng ký thất bại do lỗi hệ thống");
         }
-        $this->respond(400, "Thiếu thông tin đăng ký");
+        $this->respond(400, "Thiếu các trường bắt buộc (fullname, email, password)");
     }
 
-    // URL: http://localhost/shop_ban_hang/api/user/profile
-
+    // GET: /api/user/profile?id=1
     public function profile()
     {
         $id = $_GET['id'] ?? null;
+        if (!$id) {
+            $user = $this->authenticateUser();
+            if ($user) $id = $user['id'];
+        }
+
         if ($id) {
             $user = $this->model->getUserById($id);
             if ($user) {
                 unset($user['password']);
                 $this->respond(200, "Thành công", $user);
             }
-            $this->respond(404, "Không tìm thấy user");
+            $this->respond(404, "Không tìm thấy người dùng");
         }
         $this->respond(400, "Thiếu user id");
     }
 
-    // URL: http://localhost/shop_ban_hang/api/user/update
-
+    // POST: /api/user/update
     public function update()
     {
         $data = $this->getJsonPayload();
-        if (isset($data['id'], $data['fullname'], $data['phone'], $data['address'])) {
-            $success = $this->model->updateProfile($data['id'], $data['fullname'], $data['phone'], $data['address']);
-            if ($success) $this->respond(200, "Cập nhật thành công");
+        $id = $data['id'] ?? null;
+        if (!$id) {
+            $user = $this->authenticateUser();
+            if ($user) $id = $user['id'];
+        }
+
+        if ($id && isset($data['fullname'], $data['phone'], $data['address'])) {
+            $success = $this->model->updateProfile($id, $data['fullname'], $data['phone'], $data['address']);
+            if ($success) {
+                $this->respond(200, "Cập nhật hồ sơ thành công");
+            }
             $this->respond(500, "Cập nhật thất bại");
         }
-        $this->respond(400, "Thiếu thông tin cần cập nhật");
+        $this->respond(400, "Thiếu thông tin cần cập nhật (fullname, phone, address)");
     }
 }
+?>

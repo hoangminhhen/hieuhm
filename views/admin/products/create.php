@@ -6,6 +6,7 @@
     </div>
     <div class="card-body">
         <form action="index.php?controller=adminProduct&action=store" method="POST" enctype="multipart/form-data">
+            <?= CsrfHelper::csrfField() ?>
             
             <div class="row">
                 <div class="col-md-8">

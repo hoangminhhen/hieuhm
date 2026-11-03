@@ -1,9 +1,11 @@
 <?php
 require_once 'models/AdminOrderModel.php';
+require_once 'helpers/AuthHelper.php';
 
 class AdminOrderController {
     private $model;
     public function __construct() {
+        AuthHelper::requireAdmin();
         $this->model = new AdminOrderModel();
     }
     // HIỂN THỊ DANH SÁCH

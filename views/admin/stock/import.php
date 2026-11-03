@@ -6,6 +6,7 @@
     </div>
     <div class="card-body">
         <form action="index.php?controller=adminStock&action=store" method="POST" id="importForm">
+            <?= CsrfHelper::csrfField() ?>
             
             <div class="mb-4 p-3 bg-light border rounded">
                 <label class="fw-bold mb-2">Bước 1: Chọn Thương hiệu</label>

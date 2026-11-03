@@ -32,7 +32,7 @@
 
 <div class="table-responsive">
     <table class="table table-bordered bg-white align-middle">
-        <thead class="table-dark">
+        <thead class="table-primary">
             <tr>
                 <th>Mã ĐH</th>
                 <th>Khách hàng</th>

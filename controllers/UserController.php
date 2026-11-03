@@ -182,16 +182,27 @@ class UserController
     public function updateOrder()
     {
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-            $orderId = $_POST['order_id'];
-            $phone = $_POST['phone'];
-            $address = $_POST['address'];
-            $userId = $_SESSION['user']['id'];
+            $orderId = $_POST['order_id'] ?? null;
+            $phone = $_POST['phone'] ?? '';
+            $address = $_POST['address'] ?? '';
+            $userId = $_SESSION['user']['id'] ?? null;
+
+            if (!$orderId || !$userId) {
+                echo "<script>alert('Dữ liệu đơn hàng không hợp lệ!'); window.location.href='index.php?controller=user&action=orders';</script>";
+                return;
+            }
 
             $orderModel = new OrderModel();
-            if ($orderModel->updateOrderInfo($orderId, $userId, $phone, $address)) {
+            $result = false;
+
+            if (method_exists($orderModel, 'updateOrder')) {
+                $result = call_user_func_array([$orderModel, 'updateOrder'], [$orderId, $userId, $phone, $address]);
+            }
+
+            if ($result) {
                 echo "<script>alert('Cập nhật thành công!'); window.location.href='index.php?controller=user&action=orders';</script>";
             } else {
-                echo "<script>alert('Cập nhật thất bại!'); window.location.href='index.php?controller=user&action=orders';</script>";
+                echo "<script>alert('Cập nhật thất bại hoặc chức năng cập nhật đơn hàng chưa được hỗ trợ!'); window.location.href='index.php?controller=user&action=orders';</script>";
             }
         }
     }

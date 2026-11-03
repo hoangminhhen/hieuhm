@@ -1,14 +1,13 @@
 <?php
 require_once 'models/AdminUserModel.php';
+require_once 'helpers/AuthHelper.php';
+require_once 'helpers/CsrfHelper.php';
 
 class AdminUserController {
     private $model;
 
     public function __construct() {
-
-        if (!isset($_SESSION['user']) || $_SESSION['user']['role'] != 'admin') {
-            die("Bạn không có quyền truy cập khu vực này!");
-        }
+        AuthHelper::requireAdmin();
         $this->model = new AdminUserModel();
     }
 
@@ -27,26 +26,29 @@ class AdminUserController {
 
     public function lock() {
         if (isset($_GET['id'])) {
-            $this->model->updateStatus($_GET['id'], 0);
+            $this->model->updateStatus((int)$_GET['id'], 'locked');
         }
         header("Location: index.php?controller=adminUser&action=index");
+        exit;
     }
 
     public function unlock() {
         if (isset($_GET['id'])) {
-            $this->model->updateStatus($_GET['id'], 1);
+            $this->model->updateStatus((int)$_GET['id'], 'active');
         }
         header("Location: index.php?controller=adminUser&action=index");
+        exit;
     }
+
     public function update_role() {
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-            $id = $_POST['user_id'];
-            $role = $_POST['role'];
-
-
-            $this->model->updateRole($id, $role);
-
+            $id = (int)($_POST['user_id'] ?? 0);
+            $role = $_POST['role'] ?? 'customer';
+            if (in_array($role, ['admin', 'customer'])) {
+                $this->model->updateRole($id, $role);
+            }
             header("Location: index.php?controller=adminUser&action=index");
+            exit;
         }
     }
 }

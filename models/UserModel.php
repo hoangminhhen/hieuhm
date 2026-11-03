@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../config/db.php';
+
 class UserModel {
     private $conn;
 
@@ -8,30 +10,42 @@ class UserModel {
     }
 
     // 1. Kiểm tra email đã tồn tại chưa
-    // (Hàm này dùng chung cho cả Đăng ký và Quên mật khẩu)
     public function checkEmail($email) {
-        $stmt = $this->conn->prepare("SELECT id, email, fullname FROM users WHERE email = ?");
-        $stmt->execute([$email]);
-        // Trả về dữ liệu user nếu tìm thấy, ngược lại trả về false
+        $stmt = $this->conn->prepare("SELECT id, email, fullname, status FROM users WHERE email = ?");
+        $stmt->execute([trim($email)]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    // 2. Đăng ký tài khoản mới
+    // 2. Đăng ký tài khoản mới (Khách hàng)
     public function register($fullname, $email, $password, $phone, $address) {
-        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+        // Validate dữ liệu cơ bản
+        $email = trim($email);
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+        if (strlen($password) < 6) {
+            return false;
+        }
+
+        $hashed_password = password_hash($password, PASSWORD_BCRYPT);
         
-        $sql = "INSERT INTO users (fullname, email, password, phone, address, role) VALUES (?, ?, ?, ?, ?, 'customer')";
+        $sql = "INSERT INTO users (fullname, email, password, phone, address, role, status, created_at) 
+                VALUES (?, ?, ?, ?, ?, 'customer', 'active', NOW())";
         $stmt = $this->conn->prepare($sql);
-        return $stmt->execute([$fullname, $email, $hashed_password, $phone, $address]);
+        return $stmt->execute([trim($fullname), $email, $hashed_password, trim($phone), trim($address)]);
     }
 
-    // 3. Đăng nhập
+    // 3. Đăng nhập với kiểm tra mật khẩu và trạng thái hoạt động
     public function login($email, $password) {
         $stmt = $this->conn->prepare("SELECT * FROM users WHERE email = ?");
-        $stmt->execute([$email]);
+        $stmt->execute([trim($email)]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($user && password_verify($password, $user['password'])) {
+            // Kiểm tra trạng thái tài khoản
+            if (isset($user['status']) && $user['status'] === 'locked') {
+                return ['error' => 'ACCOUNT_LOCKED', 'message' => 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ hỗ trợ.'];
+            }
             return $user;
         }
         return false;
@@ -39,35 +53,74 @@ class UserModel {
 
     // 4. Lấy thông tin chi tiết user theo ID
     public function getUserById($id) {
-        $stmt = $this->conn->prepare("SELECT id, fullname, email, phone, address, role FROM users WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $this->conn->prepare("SELECT id, fullname, email, phone, address, role, status, created_at FROM users WHERE id = ?");
+        $stmt->execute([(int)$id]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
     // 5. Cập nhật thông tin cá nhân
     public function updateProfile($id, $fullname, $phone, $address) {
-        $sql = "UPDATE users SET fullname = ?, phone = ?, address = ? WHERE id = ?";
+        $sql = "UPDATE users SET fullname = ?, phone = ?, address = ?, updated_at = NOW() WHERE id = ?";
         $stmt = $this->conn->prepare($sql);
-        return $stmt->execute([$fullname, $phone, $address, $id]);
+        return $stmt->execute([trim($fullname), trim($phone), trim($address), (int)$id]);
     }
 
-    // ================================================================
-    // CÁC HÀM MỚI CHO CHỨC NĂNG QUÊN MẬT KHẨU
-    // ================================================================
+    // 6. Đổi mật khẩu có xác thực mật khẩu cũ
+    public function changePassword($id, $oldPassword, $newPassword) {
+        $stmt = $this->conn->prepare("SELECT password FROM users WHERE id = ?");
+        $stmt->execute([(int)$id]);
+        $currentHashed = $stmt->fetchColumn();
 
-    // 6. Lưu Token reset password vào bảng password_resets
+        if ($currentHashed && password_verify($oldPassword, $currentHashed)) {
+            $newHashed = password_hash($newPassword, PASSWORD_BCRYPT);
+            $update = $this->conn->prepare("UPDATE users SET password = ?, updated_at = NOW() WHERE id = ?");
+            return $update->execute([$newHashed, (int)$id]);
+        }
+        return false;
+    }
+
+    // 7. Tạo hoặc cấp API Bearer Token
+    public function generateApiToken($userId, $deviceInfo = 'Web Client') {
+        $token = bin2hex(random_bytes(32));
+        $expiresAt = date('Y-m-d H:i:s', strtotime('+30 days'));
+
+        $sql = "INSERT INTO user_tokens (user_id, token, device_info, expires_at, created_at) 
+                VALUES (?, ?, ?, ?, NOW())";
+        try {
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute([(int)$userId, $token, $deviceInfo, $expiresAt]);
+            return ['token' => $token, 'expires_at' => $expiresAt];
+        } catch (Exception $e) {
+            // Trường hợp bảng user_tokens chưa được tạo, fallback token đơn giản
+            return ['token' => base64_encode($userId . ':' . $token), 'expires_at' => $expiresAt];
+        }
+    }
+
+    // 8. Xác thực người dùng bằng API Token
+    public function getUserByToken($token) {
+        try {
+            $sql = "SELECT u.id, u.fullname, u.email, u.phone, u.role, u.status 
+                    FROM users u 
+                    JOIN user_tokens t ON u.id = t.user_id 
+                    WHERE t.token = ? AND t.expires_at > NOW() AND u.status = 'active'";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute([$token]);
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    // 9. Quản lý Quên mật khẩu
     public function saveResetToken($email, $token) {
-        // Xóa token cũ của email này nếu có (để tránh rác database)
         $sqlDelete = "DELETE FROM password_resets WHERE email = ?";
         $this->conn->prepare($sqlDelete)->execute([$email]);
 
-        // Thêm token mới
-        $sql = "INSERT INTO password_resets (email, token) VALUES (?, ?)";
+        $sql = "INSERT INTO password_resets (email, token, created_at) VALUES (?, ?, NOW())";
         $stmt = $this->conn->prepare($sql);
         return $stmt->execute([$email, $token]);
     }
 
-    // 7. Kiểm tra Token có hợp lệ không (Đúng token và chưa hết hạn)
     public function verifyToken($email, $token) {
         $sql = "SELECT * FROM password_resets WHERE email = ? AND token = ?";
         $stmt = $this->conn->prepare($sql);
@@ -75,26 +128,21 @@ class UserModel {
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($result) {
-            // Kiểm tra thời gian hết hạn (ví dụ: token chỉ sống trong 1 giờ = 3600 giây)
             $createdAt = strtotime($result['created_at']);
             if (time() - $createdAt < 3600) { 
-                return true; // Token hợp lệ
+                return true;
             }
         }
-        return false; // Token sai hoặc hết hạn
+        return false;
     }
 
-    // 8. Cập nhật mật khẩu mới theo Email
     public function updatePasswordByEmail($email, $newPassword) {
-        // Mã hóa mật khẩu mới
-        $hashed = password_hash($newPassword, PASSWORD_DEFAULT);
-        
-        // Cập nhật bảng users
-        $sql = "UPDATE users SET password = ? WHERE email = ?";
+        $hashed = password_hash($newPassword, PASSWORD_BCRYPT);
+        $sql = "UPDATE users SET password = ?, updated_at = NOW() WHERE email = ?";
         $this->conn->prepare($sql)->execute([$hashed, $email]);
 
-        // Xóa token trong bảng password_resets sau khi đổi thành công
         $this->conn->prepare("DELETE FROM password_resets WHERE email = ?")->execute([$email]);
+        return true;
     }
 }
 ?>

@@ -6,6 +6,7 @@
     </div>
     <div class="card-body">
         <form action="index.php?controller=adminProduct&action=update" method="POST" enctype="multipart/form-data">
+            <?= CsrfHelper::csrfField() ?>
             <input type="hidden" name="id" value="<?= $product['id'] ?>">
             <input type="hidden" name="current_image" value="<?= $product['image'] ?>">
             

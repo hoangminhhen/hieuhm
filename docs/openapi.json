@@ -1,0 +1,332 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Sport Kicks - Football Boots E-Commerce API",
+    "description": "API Contract chuẩn hóa cho hệ thống cửa hàng giày bóng đá Sport Kicks. Hỗ trợ xác thực người dùng, duyệt danh mục sản phẩm, đồng bộ giỏ hàng, luồng đặt hàng và quản lý kho bãi.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Sport Kicks Engineering Team",
+      "email": "dev@sportkicks.vn"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost/shop_ban_hang",
+      "description": "Local XAMPP Development Server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT/Token",
+        "description": "Nhập API Token nhận được sau khi đăng nhập."
+      }
+    },
+    "schemas": {
+      "ApiResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "integer", "example": 200 },
+          "success": { "type": "boolean", "example": true },
+          "message": { "type": "string", "example": "Thành công" },
+          "data": { "type": "object" },
+          "meta": { "type": "object" }
+        }
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 1 },
+          "name": { "type": "string", "example": "Nike Air Zoom Mercurial Vapor 16 Pro TF" },
+          "slug": { "type": "string", "example": "nike-air-zoom-mercurial-vapor-16-pro-tf" },
+          "sku": { "type": "string", "example": "NK-VP16-TF-BLU" },
+          "brand_name": { "type": "string", "example": "Nike Football" },
+          "cat_name": { "type": "string", "example": "Giày Sân Cỏ Nhân Tạo (TF)" },
+          "price": { "type": "number", "example": 2390000 },
+          "old_price": { "type": "number", "example": 2750000 },
+          "sale_price": { "type": "number", "example": 2190000 },
+          "image": { "type": "string", "example": "https://images.unsplash.com/photo-1542291026-7eec264c27ff" },
+          "ground_type": { "type": "string", "example": "Sân cỏ nhân tạo TF" },
+          "available_sizes": { "type": "string", "example": "39, 40, 41, 42, 43" }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 2 },
+          "fullname": { "type": "string", "example": "Nguyễn Văn Hải" },
+          "email": { "type": "string", "example": "khachhang@sportkicks.vn" },
+          "phone": { "type": "string", "example": "0988776655" },
+          "address": { "type": "string", "example": "120 Nguyễn Thị Minh Khai, Quận 3, TP.HCM" },
+          "role": { "type": "string", "example": "customer" }
+        }
+      },
+      "CartItem": {
+        "type": "object",
+        "required": ["product_id", "size", "quantity"],
+        "properties": {
+          "product_id": { "type": "integer", "example": 1 },
+          "size": { "type": "string", "example": "41" },
+          "quantity": { "type": "integer", "example": 1 },
+          "price": { "type": "number", "example": 2190000 }
+        }
+      },
+      "CustomerData": {
+        "type": "object",
+        "required": ["fullname", "phone", "address"],
+        "properties": {
+          "fullname": { "type": "string", "example": "Nguyễn Văn Hải" },
+          "phone": { "type": "string", "example": "0988776655" },
+          "address": { "type": "string", "example": "120 Nguyễn Thị Minh Khai, Quận 3, TP.HCM" },
+          "note": { "type": "string", "example": "Giao hàng giờ hành chính" },
+          "payment_method": { "type": "string", "enum": ["COD", "BANKING", "VNPAY", "MOMO"], "example": "COD" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/user/login": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Đăng nhập người dùng",
+        "description": "Xác thực bằng Email và Mật khẩu, trả về thông tin người dùng và API Bearer Token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "example": "khachhang@sportkicks.vn" },
+                  "password": { "type": "string", "example": "123456" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Đăng nhập thành công" },
+          "401": { "description": "Sai tài khoản hoặc mật khẩu" },
+          "403": { "description": "Tài khoản bị khóa" }
+        }
+      }
+    },
+    "/api/user/register": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Đăng ký thành viên mới",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["fullname", "email", "password"],
+                "properties": {
+                  "fullname": { "type": "string", "example": "Trần Tiến Dũng" },
+                  "email": { "type": "string", "example": "tiendung@gmail.com" },
+                  "password": { "type": "string", "example": "123456" },
+                  "phone": { "type": "string", "example": "0912345678" },
+                  "address": { "type": "string", "example": "Hà Nội" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Đăng ký thành công" },
+          "409": { "description": "Email đã tồn tại" }
+        }
+      }
+    },
+    "/api/product/index": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "Danh sách sản phẩm giày bóng đá (có lọc, tìm kiếm, phân trang)",
+        "parameters": [
+          { "name": "keyword", "in": "query", "description": "Từ khóa tìm kiếm (Mercurial, Predator...)", "schema": { "type": "string" } },
+          { "name": "category_id", "in": "query", "description": "ID mặt sân (1: TF, 2: FG, 3: IC)", "schema": { "type": "integer" } },
+          { "name": "sort", "in": "query", "description": "Sắp xếp (newest, price_asc, price_desc, name_az)", "schema": { "type": "string", "default": "newest" } },
+          { "name": "page", "in": "query", "description": "Số trang", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "description": "Số lượng mỗi trang", "schema": { "type": "integer", "default": 9 } }
+        ],
+        "responses": {
+          "200": { "description": "Lấy danh sách thành công" }
+        }
+      }
+    },
+    "/api/product/detail": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "Chi tiết giày bóng đá kèm danh sách size còn hàng",
+        "parameters": [
+          { "name": "id", "in": "query", "required": true, "description": "ID sản phẩm", "schema": { "type": "integer", "example": 1 } }
+        ],
+        "responses": {
+          "200": { "description": "Lấy chi tiết thành công" },
+          "404": { "description": "Không tìm thấy sản phẩm" }
+        }
+      }
+    },
+    "/api/product/flash_sale": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "Danh sách các mẫu giày đang Flash Sale",
+        "responses": {
+          "200": { "description": "Thành công" }
+        }
+      }
+    },
+    "/api/cart/add": {
+      "post": {
+        "tags": ["Cart"],
+        "summary": "Thêm giày vào giỏ hàng (Kiểm tra kho tức thời)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["product_id", "size", "quantity"],
+                "properties": {
+                  "product_id": { "type": "integer", "example": 1 },
+                  "size": { "type": "string", "example": "41" },
+                  "quantity": { "type": "integer", "example": 1 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Thêm vào giỏ thành công" },
+          "400": { "description": "Hết hàng hoặc số lượng yêu cầu vượt quá tồn kho" }
+        }
+      }
+    },
+    "/api/cart/get": {
+      "get": {
+        "tags": ["Cart"],
+        "summary": "Lấy giỏ hàng theo User ID",
+        "parameters": [
+          { "name": "user_id", "in": "query", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Thành công" }
+        }
+      }
+    },
+    "/api/order/create": {
+      "post": {
+        "tags": ["Orders & Checkout"],
+        "summary": "Đặt hàng (Checkout an toàn với DB Transaction & kiểm tra kho)",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["user_id", "customer_data", "cart_items"],
+                "properties": {
+                  "user_id": { "type": "integer", "example": 2 },
+                  "customer_data": { "$ref": "#/components/schemas/CustomerData" },
+                  "cart_items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "integer", "example": 1 },
+                        "size": { "type": "string", "example": "41" },
+                        "quantity": { "type": "integer", "example": 1 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Đặt hàng thành công" },
+          "400": { "description": "Lỗi dữ liệu hoặc tồn kho không đủ" }
+        }
+      }
+    },
+    "/api/order/history": {
+      "get": {
+        "tags": ["Orders & Checkout"],
+        "summary": "Lịch sử mua hàng của khách hàng",
+        "parameters": [
+          { "name": "user_id", "in": "query", "required": true, "schema": { "type": "integer", "example": 2 } }
+        ],
+        "responses": {
+          "200": { "description": "Thành công" }
+        }
+      }
+    },
+    "/api/order/cancel": {
+      "post": {
+        "tags": ["Orders & Checkout"],
+        "summary": "Hủy đơn hàng (Tự động hoàn lại tồn kho)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["order_id"],
+                "properties": {
+                  "order_id": { "type": "integer", "example": 1 },
+                  "user_id": { "type": "integer", "example": 2 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Hủy đơn hàng và hoàn kho thành công" },
+          "400": { "description": "Không thể hủy đơn này" }
+        }
+      }
+    },
+    "/api/adminStock/import": {
+      "post": {
+        "tags": ["Admin Warehouse"],
+        "summary": "Nhập kho sản phẩm theo size",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["product_id", "size", "quantity", "import_price"],
+                "properties": {
+                  "product_id": { "type": "integer", "example": 1 },
+                  "size": { "type": "string", "example": "42" },
+                  "quantity": { "type": "integer", "example": 10 },
+                  "import_price": { "type": "number", "example": 1500000 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Nhập kho thành công" }
+        }
+      }
+    },
+    "/api/adminStock/history": {
+      "get": {
+        "tags": ["Admin Warehouse"],
+        "summary": "Xem lịch sử nhập kho",
+        "responses": {
+          "200": { "description": "Thành công" }
+        }
+      }
+    }
+  }
+}
+

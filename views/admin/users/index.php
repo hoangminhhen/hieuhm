@@ -16,7 +16,7 @@
                 </form>
             </div>
             <table class="table table-bordered table-hover align-middle">
-                <thead class="table-dark">
+                <thead class="table-primary">
                     <tr>
                         <th>ID</th>
                         <th>Họ tên</th>
